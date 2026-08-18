@@ -1,0 +1,28 @@
+#include "connection.h"
+#include <unistd.h>
+//fd = file descriptor
+
+Connection::Connection(socket_t fd): fd_(fd) {
+
+}
+
+Connection::~Connection() {
+    if(fd_ != -1) {
+        close(fd_);
+    }
+}
+
+Connection::Connection(Connection&& other) noexcept: fd_(other.fd_) {
+    other.fd_ = -1;
+}
+
+Connection& Connection::operator=(Connection&& other) noexcept {
+
+    socket_t tmp = other.fd_;
+    other.fd_ = -1;
+    if(fd_ != -1) {
+        close(fd_);
+    }
+    fd_ = tmp;
+    return *this;
+}
