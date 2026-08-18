@@ -26,3 +26,8 @@ Connection& Connection::operator=(Connection&& other) noexcept {
     fd_ = tmp;
     return *this;
 }
+
+//Getter
+socket_t Connection::get() const noexcept {
+    return fd_;
+}

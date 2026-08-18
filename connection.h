@@ -15,6 +15,7 @@ using socket_t = int;
 
 class Connection {
     public:
+        socket_t get() const noexcept;
         //Explicit socket, no silent int conversion
         explicit Connection(socket_t fd);
         ~Connection();
