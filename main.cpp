@@ -1,7 +1,9 @@
 //#include "TcpHttpServerImplementation.h"
-#include <iostream>
 #include <cstdio>
 #include "listener.h"
+#include "resultType.h"
+#include <cstring>
+#include <utility>
 
 /*int main() {
   TcpHttpServerImplementation test;
@@ -10,25 +12,29 @@
   }*/
 
 int main() {
-    auto listener = Listener::create(8080);
-    if (!listener) {
+    uint16_t port = 8080;
+    tcp::Result<Listener> made = Listener::create(port);
+    if (!made) {
+        fprintf(stderr, "create failed: %s\n", strerror(made.error()));
         return 1;
     }
-    printf("listening, fd = %d\n", listener->get());
 
-    //Accept() debug
+    Listener listener = std::move(made.value());
+    printf("listening on %d  (listener fd = %d)\n", port, listener.get());
+
     for (int i = 1; i <= 3; i = i + 1) {
         printf("[%d] waiting for a client...\n", i);
 
-        std::optional<Connection> conn = listener->accept();
-        if (!conn) {
-            printf("[%d] accept failed, stopping\n", i);
+        tcp::Result<Connection> incoming = listener.accept();
+        if (!incoming) {
+            fprintf(stderr, "[%d] accept failed: %s\n", i, strerror(incoming.error()));
             break;
         }
-        printf("[%d] client connected on fd %d\n", i, conn->get());
 
-    }
-    // ^^^ Accept() Debug
+        Connection conn = std::move(incoming.value());
+        printf("[%d] client connected on fd %d\n", i, conn.get());
+
+    }   // conn destructs here -> close() on the client fd
 
     printf("\ndone -- listener closes as main returns\n");
     return 0;

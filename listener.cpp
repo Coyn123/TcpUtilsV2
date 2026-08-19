@@ -1,12 +1,11 @@
 #include "listener.h"
-#include <cstdint>
-#include <cstdio>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <cerrno>
 
-std::optional<Listener> Listener::create(uint16_t port) {
+tcp::Result<Listener> Listener::create(uint16_t port) {
 
     socket_t fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -16,17 +15,17 @@ std::optional<Listener> Listener::create(uint16_t port) {
 
     //Check socket validity
     if (fd == -1) {
-        perror("socket");
-        return std::nullopt;
+        int e = errno;
+        return tcp::Result<Listener>::err(e);
     }
 
     //Socket configuartion validity
     int yes = 1;
 
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-        perror("setsockopt");
+        int e = errno;
         close(fd);
-        return std::nullopt;
+        return tcp::Result<Listener>::err(e);
     }
 
     //Socket address validity
@@ -35,28 +34,28 @@ std::optional<Listener> Listener::create(uint16_t port) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
     if(bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
-        perror("bind");
+        int e = errno;
         close(fd);
-        return std::nullopt;
+        return tcp::Result<Listener>::err(e);
     }
 
     //Listener + max connection validity
     if(listen(fd, SOMAXCONN) == -1) {
-        perror("listen");
+        int e = errno;
         close(fd);
-        return std::nullopt;
+        return tcp::Result<Listener>::err(e);
     }
 
-    return Listener(fd);
+    return tcp::Result<Listener>::ok(Listener(fd));
 }
 
-std::optional<Connection> Listener::accept() {
+tcp::Result<Connection> Listener::accept() {
     socket_t fd = ::accept(fd_, nullptr, nullptr);
     if (fd == -1) {
-        perror("accept");
-        return std::nullopt;
+        int e = errno;
+        return tcp::Result<Connection>::err(e);
     }
-    return Connection(fd);
+    return tcp::Result<Connection>::ok(Connection(fd));
 }
 
 Listener::~Listener() {

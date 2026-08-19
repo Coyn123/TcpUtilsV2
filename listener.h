@@ -1,12 +1,12 @@
 #pragma once
 #include "connection.h"
 #include <cstdint>
-#include <optional>
+#include "resultType.h"
 
 class Listener {
     public:
-        static std::optional<Listener> create(uint16_t port);
-        std::optional<Connection> accept();
+        static tcp::Result<Listener> create(uint16_t port);
+        tcp::Result<Connection> accept();
 
         ~Listener();
         Listener(const Listener&) = delete;
