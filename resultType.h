@@ -9,14 +9,10 @@ template <typename T>
 class Result {
     public:
         static Result ok(T value) {
-            return Result(
-                std::in_place_index<0>,
-                std::move(value));
+            return Result(std::in_place_index<0>, std::move(value));
         }
         static Result err(int code) {
-            return Result(
-            std::in_place_index<1>,
-            code);
+            return Result(std::in_place_index<1>, code);
         }
         bool has_value() const noexcept { return storage_.index() == 0; }
         explicit operator bool() const noexcept { return has_value(); }

@@ -13,7 +13,7 @@ tcp::Result<Listener> Listener::create(uint16_t port) {
 
     //Check socket validity
     if (fd == kInvalidSocket) {
-        int e = last_error();;
+        int e = last_error();
         return tcp::Result<Listener>::err(e);
     }
 

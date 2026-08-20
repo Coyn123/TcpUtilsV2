@@ -5,14 +5,9 @@
 #include <cstring>
 #include <utility>
 
-/*int main() {
-  TcpHttpServerImplementation test;
-  test.run();
-  return 0;
-  }*/
-
 int main() {
     uint16_t port = 8080;
+
     tcp::Result<Listener> made = Listener::create(port);
     if (!made) {
         fprintf(stderr, "create failed: %s\n", strerror(made.error()));
@@ -20,7 +15,7 @@ int main() {
     }
 
     Listener listener = std::move(made.value());
-    printf("listening on %d  (listener fd = %d)\n", port, listener.get());
+    printf("listening on %d\n", port);
 
     for (int i = 1; i <= 3; i = i + 1) {
         printf("[%d] waiting for a client...\n", i);
@@ -32,7 +27,7 @@ int main() {
         }
 
         Connection conn = std::move(incoming.value());
-        printf("[%d] client connected on fd %d\n", i, conn.get());
+        printf("[%d] client connected\n", i);
 
     }   // conn destructs here -> close() on the client fd
 

@@ -1,6 +1,5 @@
 #include "connection.h"
 #include "platform.h"
-//fd = file descriptor
 
 Connection::Connection(socket_t fd): fd_(fd) {
 
@@ -27,6 +26,8 @@ Connection& Connection::operator=(Connection&& other) noexcept {
     return *this;
 }
 
+tcp::Result<size_t> Connection::read_some(char* buf, size_t len) { return tcp::Result<size_t>::err(0); }
+tcp::Result<size_t> Connection::write_some(const char* buf, size_t len) { return tcp::Result<size_t>::err(0); }
 //Getter
 socket_t Connection::get() const noexcept {
     return fd_;

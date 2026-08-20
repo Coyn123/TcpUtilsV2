@@ -1,12 +1,17 @@
 #pragma once
 #include "platform.h"
+#include "stream.h"
 
-class Connection {
+class Connection : public tcp::IStream {
     public:
         socket_t get() const noexcept;
+
+        tcp::Result<size_t> read_some(char* buf, size_t len) override;
+        tcp::Result<size_t> write_some(const char* buf, size_t len) override;
+
         //Explicit socket, no silent int conversion
         explicit Connection(socket_t fd);
-        ~Connection();
+        ~Connection() override;
 
         Connection(const Connection&) = delete;
         Connection& operator=(const Connection&) = delete;
