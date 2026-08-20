@@ -1,11 +1,9 @@
 #include "listener.h"
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <cerrno>
+#include "platform.h"
 
 tcp::Result<Listener> Listener::create(uint16_t port) {
+
+    tcp::ensure_started();
 
     socket_t fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -14,17 +12,15 @@ tcp::Result<Listener> Listener::create(uint16_t port) {
     //After the object is created the deconstructor owns the fd cleanup
 
     //Check socket validity
-    if (fd == -1) {
-        int e = errno;
+    if (fd == kInvalidSocket) {
+        int e = last_error();;
         return tcp::Result<Listener>::err(e);
     }
 
     //Socket configuartion validity
-    int yes = 1;
-
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-        int e = errno;
-        close(fd);
+    if (set_reuseaddr(fd) != 0) {
+        int e = last_error();
+        close_socket(fd);
         return tcp::Result<Listener>::err(e);
     }
 
@@ -33,16 +29,16 @@ tcp::Result<Listener> Listener::create(uint16_t port) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
-    if(bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
-        int e = errno;
-        close(fd);
+    if(bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        int e = last_error();
+        close_socket(fd);
         return tcp::Result<Listener>::err(e);
     }
 
     //Listener + max connection validity
-    if(listen(fd, SOMAXCONN) == -1) {
-        int e = errno;
-        close(fd);
+    if(listen(fd, SOMAXCONN) != 0) {
+        int e = last_error();
+        close_socket(fd);
         return tcp::Result<Listener>::err(e);
     }
 
@@ -51,21 +47,21 @@ tcp::Result<Listener> Listener::create(uint16_t port) {
 
 tcp::Result<Connection> Listener::accept() {
     socket_t fd = ::accept(fd_, nullptr, nullptr);
-    if (fd == -1) {
-        int e = errno;
+    if (fd == kInvalidSocket) {
+        int e = last_error();
         return tcp::Result<Connection>::err(e);
     }
     return tcp::Result<Connection>::ok(Connection(fd));
 }
 
 Listener::~Listener() {
-    if (fd_ != -1) {
-        close(fd_);
+    if (fd_ != kInvalidSocket) {
+        close_socket(fd_);
     }
 }
 
 Listener::Listener(Listener&& other) noexcept: fd_(other.fd_) {
-    other.fd_ = -1;
+    other.fd_ = kInvalidSocket;
 }
 
 Listener::Listener(socket_t fd): fd_(fd) {}
@@ -73,9 +69,9 @@ Listener::Listener(socket_t fd): fd_(fd) {}
 Listener& Listener::operator=(Listener&& other) noexcept {
 
     socket_t tmp = other.fd_;
-    other.fd_ = -1;
-    if(fd_ != -1) {
-        close(fd_);
+    other.fd_ = kInvalidSocket;
+    if(fd_ != kInvalidSocket) {
+        close_socket(fd_);
     }
     fd_ = tmp;
     return *this;

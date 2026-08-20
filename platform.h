@@ -1,0 +1,51 @@
+//An attempt at making the utility platform agnostic
+#pragma once
+#ifdef _WIN32
+  #include <winsock2.h>
+  #include <ws2tcpip.h>
+  using socket_t = SOCKET;
+  inline constexpr socket_t kInvalidSocket = INVALID_SOCKET;
+  inline int close_socket(socket_t s) { return ::closesocket(s); }
+  inline int last_error() { return ::WSAGetLastError(); }
+  inline int set_reuseaddr(socket_t s) {
+      char yes = 1;
+      return ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  }
+#else
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <unistd.h>
+  #include <cerrno>
+  using socket_t = int;
+  inline constexpr socket_t kInvalidSocket = -1;
+  inline int close_socket(socket_t s) { return ::close(s); }
+  inline int last_error() { return errno; }
+  inline int set_reuseaddr(socket_t s) {
+      int yes = 1;
+      return ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  }
+#endif
+
+
+namespace tcp {
+    class PlatformInit {
+        public:
+            PlatformInit() {
+                #ifdef _WIN32
+                    WSADATA d;
+                    WSAStartup(MAKEWORD(2, 2), &d);
+                #endif
+            }
+            ~PlatformInit() {
+                #ifdef _WIN32
+                    WSACleanup();
+                #endif
+            }
+
+            PlatformInit(const PlatformInit&) = delete;
+            PlatformInit& operator=(const PlatformInit&) = delete;
+    };
+
+    inline void ensure_started() { static PlatformInit once; }
+}
