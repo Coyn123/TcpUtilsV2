@@ -1,4 +1,3 @@
-//#include "TcpHttpServerImplementation.h"
 #include <cstdio>
 #include "listener.h"
 #include "resultType.h"
@@ -7,7 +6,6 @@
 
 int main() {
     uint16_t port = 8080;
-
     tcp::Result<Listener> made = Listener::create(port);
     if (!made) {
         fprintf(stderr, "create failed: %s\n", strerror(made.error()));
@@ -27,19 +25,39 @@ int main() {
         }
 
         Connection conn = std::move(incoming.value());
-        char buffer[512];
-        tcp::Result<size_t> response = conn.read_some(buffer, sizeof(buffer));
-        if ( response.has_value() ) {
-            // size_t to int cast because of printf only
-            int value = response.value();
-            printf("[%.*s] result\n", value, buffer);
-            printf("result value ---> %d\n", value);
-        } else {
-            fprintf(stderr, "read failed: %s\n", strerror(response.error()));
-        }
         printf("[%d] client connected\n", i);
 
-    }   // conn destructs here -> close() on the client fd
+        char buffer[512];
+        tcp::Result<size_t> response = conn.read_some(buffer, sizeof(buffer));
+
+        if (!response.has_value()) {
+            fprintf(stderr, "[%d] read failed: %s\n", i, strerror(response.error()));
+            continue;
+        }
+
+        int bytesRead = (int)response.value();
+        printf("[%d] read %d bytes: [%.*s]\n", i, bytesRead, bytesRead, buffer);
+
+        if (bytesRead == 0) {
+            printf("[%d] client sent nothing (EOF) -- nothing to echo\n", i);
+            continue;
+        }
+
+        tcp::Result<size_t> written = conn.write_some(buffer, (size_t)bytesRead);
+
+        if (!written.has_value()) {
+            fprintf(stderr, "[%d] write failed: %s\n", i, strerror(written.error()));
+            continue;
+        }
+
+        int bytesWritten = (int)written.value();
+        printf("[%d] echoed %d of %d bytes back to the client\n", i, bytesWritten, bytesRead);
+
+        if (bytesWritten < bytesRead) {
+            printf("[%d] (short write -- write_all would need to loop here)\n", i);
+        }
+
+    }
 
     printf("\ndone -- listener closes as main returns\n");
     return 0;

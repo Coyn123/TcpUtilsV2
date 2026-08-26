@@ -27,6 +27,23 @@
   }
 #endif
 
+#ifdef SO_NOSIGPIPE
+  inline int set_macopt(socket_t s) {
+      int yes = 1;
+      return ::setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
+  }
+#else
+  inline void set_macopt(socket_t s) {
+      return;
+  }
+#endif
+
+#ifdef MSG_NOSIGNAL
+  inline constexpr int kNoSignalFlag = MSG_NOSIGNAL;
+#else
+  inline constexpr int kNoSignalFlag = 0;
+#endif
+
 
 namespace tcp {
     class PlatformInit {
