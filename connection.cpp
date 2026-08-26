@@ -1,5 +1,6 @@
 #include "connection.h"
 #include "platform.h"
+#include <string>
 
 Connection::Connection(socket_t fd): fd_(fd) {
 
@@ -26,7 +27,19 @@ Connection& Connection::operator=(Connection&& other) noexcept {
     return *this;
 }
 
-tcp::Result<size_t> Connection::read_some(char* buf, size_t len) { return tcp::Result<size_t>::err(0); }
+tcp::Result<size_t> Connection::read_some(char* buf, size_t len) {
+    for (;;) {
+        auto resp = recv(fd_, buf, len, 0);
+        int e = last_error();
+        if (resp < 0 and e == EINTR) {
+            continue;
+        }
+        if(resp < 0 && e != EINTR) {
+            return tcp::Result<size_t>::err(e);
+        } else if(resp == 0) return tcp::Result<size_t>::ok(0);
+        else return tcp::Result<size_t>::ok(resp);
+    };
+}
 tcp::Result<size_t> Connection::write_some(const char* buf, size_t len) { return tcp::Result<size_t>::err(0); }
 //Getter
 socket_t Connection::get() const noexcept {

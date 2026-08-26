@@ -27,6 +27,16 @@ int main() {
         }
 
         Connection conn = std::move(incoming.value());
+        char buffer[512];
+        tcp::Result<size_t> response = conn.read_some(buffer, sizeof(buffer));
+        if ( response.has_value() ) {
+            // size_t to int cast because of printf only
+            int value = response.value();
+            printf("[%.*s] result\n", value, buffer);
+            printf("result value ---> %d\n", value);
+        } else {
+            fprintf(stderr, "read failed: %s\n", strerror(response.error()));
+        }
         printf("[%d] client connected\n", i);
 
     }   // conn destructs here -> close() on the client fd

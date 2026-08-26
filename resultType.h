@@ -36,4 +36,4 @@ class Result {
         std::variant<T, int> storage_;
 };
 
-} //namespace close
+}
