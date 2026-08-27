@@ -1,5 +1,5 @@
 #pragma once
-#include "resultType.h"
+#include "ResultType.h"
 #include <cstddef>
 
 namespace tcp {

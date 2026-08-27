@@ -1,7 +1,7 @@
 #pragma once
-#include "connection.h"
+#include "Connection.h"
 #include <cstdint>
-#include "resultType.h"
+#include "ResultType.h"
 
 class Listener {
     public:

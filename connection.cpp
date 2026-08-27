@@ -1,5 +1,5 @@
-#include "connection.h"
-#include "platform.h"
+#include "Connection.h"
+#include "Platform.h"
 #include <string>
 
 Connection::Connection(socket_t fd): fd_(fd) {

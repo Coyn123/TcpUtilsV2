@@ -1,6 +1,6 @@
 #pragma once
-#include "platform.h"
-#include "stream.h"
+#include "Platform.h"
+#include "Stream.h"
 
 class Connection : public tcp::IStream {
     public:
