@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "Listener.h"
+#include "BufferedReader.h"
 #include "ResultType.h"
 #include <cstring>
 #include <utility>
@@ -15,6 +16,9 @@ int main() {
     Listener listener = std::move(made.value());
     printf("listening on %d\n", port);
 
+    const std::string delim = "\n";
+    const size_t byte_max = 64;
+
     for (int i = 1; i <= 3; i = i + 1) {
         printf("[%d] waiting for a client...\n", i);
 
@@ -27,36 +31,27 @@ int main() {
         Connection conn = std::move(incoming.value());
         printf("[%d] client connected\n", i);
 
-        char buffer[512];
-        tcp::Result<size_t> response = conn.read_some(buffer, sizeof(buffer));
+        BufferedReader reader(conn);
 
-        if (!response.has_value()) {
-            fprintf(stderr, "[%d] read failed: %s\n", i, strerror(response.error()));
-            continue;
+        int msg_num = 1;
+        while (true) {
+            tcp::Result<tcp::BufferedResult> res = reader.read_until(delim, byte_max);
+
+            if (!res.has_value()) {
+                fprintf(stderr, "[%d] read_until failed: %s\n", i, strerror(res.error()));
+                break;
+            }
+
+            const tcp::BufferedResult& br = res.value();
+            printf("[%d] msg %d complete=%s (%zu bytes): [%s]\n",
+                   i, msg_num, br.complete ? "true" : "false", br.bytes.size(), br.bytes.c_str());
+            msg_num++;
+
+            if (!br.complete) {
+                printf("[%d] stream ended or byte_max hit before the delimiter showed up -- done with this client\n", i);
+                break;
+            }
         }
-
-        int bytesRead = (int)response.value();
-        printf("[%d] read %d bytes: [%.*s]\n", i, bytesRead, bytesRead, buffer);
-
-        if (bytesRead == 0) {
-            printf("[%d] client sent nothing (EOF) -- nothing to echo\n", i);
-            continue;
-        }
-
-        tcp::Result<size_t> written = conn.write_some(buffer, (size_t)bytesRead);
-
-        if (!written.has_value()) {
-            fprintf(stderr, "[%d] write failed: %s\n", i, strerror(written.error()));
-            continue;
-        }
-
-        int bytesWritten = (int)written.value();
-        printf("[%d] echoed %d of %d bytes back to the client\n", i, bytesWritten, bytesRead);
-
-        if (bytesWritten < bytesRead) {
-            printf("[%d] (short write -- write_all would need to loop here)\n", i);
-        }
-
     }
 
     printf("\ndone -- listener closes as main returns\n");

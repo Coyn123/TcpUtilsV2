@@ -20,6 +20,8 @@ class BufferedReader {
         tcp::Result<tcp::BufferedResult> read_until(const std::string& delim, size_t byte_max);
 
     private:
+        std::string split_on_delim(std::string& txt, size_t pos, const std::string& delim);
+
         tcp::IStream& stream_;
         std::string buffer_;
 
