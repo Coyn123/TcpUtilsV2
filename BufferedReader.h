@@ -21,6 +21,7 @@ class BufferedReader {
 
     private:
         std::string split_on_delim(std::string& txt, size_t pos, const std::string& delim);
+        tcp::Result<size_t> read_one_more_chunk(char* chunk, size_t byte_max, size_t byte_check, size_t chunk_size);
 
         tcp::IStream& stream_;
         std::string buffer_;
