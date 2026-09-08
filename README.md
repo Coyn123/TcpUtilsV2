@@ -10,13 +10,13 @@ Active work in progress. Development is currently focused on a small, self-conta
 
 - **[Platform.h](Platform.h)** — thin cross-platform shim over BSD sockets / Winsock: a common `socket_t` type, `close_socket`/`last_error` wrappers, one-time `WSAStartup`/`WSACleanup` via `ensure_started()`, and SIGPIPE-safe send flags.
 - **[ResultType.h](ResultType.h)** — `tcp::Result<T>`, a minimal success-value-or-error-code type used in place of exceptions across the API.
-- **[Stream.h](Stream.h)** — `tcp::IStream`, the `read_some` / `write_some` / `write_all` interface `Connection` implements, so higher-level code depends on an abstraction rather than a raw socket.
+- **[Stream.h](Stream.h) / [Stream.cpp](Stream.cpp)** — `tcp::IStream`, the `read_some` / `write_some` / `write_all` interface `Connection` implements, so higher-level code depends on an abstraction rather than a raw socket. `read_some`/`write_some` are pure virtual; `write_all` is a concrete loop over `write_some` that accumulates bytes written and retries on short writes.
 - **[Connection.h](Connection.h) / [Connection.cpp](Connection.cpp)** — RAII wrapper around a connected socket: move-only, closes its descriptor on destruction, retries on `EINTR`, and reports peer EOF as `Result::ok(0)` rather than an error.
 - **[Listener.h](Listener.h) / [Listener.cpp](Listener.cpp)** — RAII wrapper around a listening socket. `Listener::create(port)` is a factory returning `Result<Listener>`, so a partially-initialized listener can never escape into a live object; `accept()` hands back a `Connection`.
-- **[BufferedReader.h](BufferedReader.h) / [BufferedReader.cpp](BufferedReader.cpp)** — delimiter-based buffered reads (`read_until`) on top of an `IStream`. Interface is in place; the implementation is currently a stub.
+- **[BufferedReader.h](BufferedReader.h) / [BufferedReader.cpp](BufferedReader.cpp)** — delimiter-based buffered reads (`read_until`) on top of an `IStream`.
 - **[Main.cpp](Main.cpp)** — a small echo-server demo exercising `Listener` and `Connection` end to end.
 
-Together these give you a working, dependency-free echo server today, with `BufferedReader` as the next piece being built out.
+Together these give you a working, dependency-free echo server today. The active core — `Listener`, `Connection`, `IStream`/`Stream`, `BufferedReader` — is now feature-complete for basic reads and writes.
 
 ## Direction / work-in-progress area
 
@@ -30,8 +30,8 @@ There's no build system wired up yet — compile the active core directly:
 
 ```bash
 # Linux/macOS
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp BufferedReader.cpp -o server
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp -o server
 
 # Windows (MinGW)
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp BufferedReader.cpp -o server.exe -lws2_32
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp -o server.exe -lws2_32
 ```
