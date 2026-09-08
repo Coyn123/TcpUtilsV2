@@ -18,6 +18,7 @@ class BufferedReader {
         BufferedReader& operator=(BufferedReader&&) noexcept = delete;
 
         tcp::Result<tcp::BufferedResult> read_until(const std::string& delim, size_t byte_max);
+        tcp::Result<tcp::BufferedResult> read_exact(size_t byte_max);
 
     private:
         std::string split_on_delim(std::string& txt, size_t pos, const std::string& delim);
