@@ -8,19 +8,29 @@ Active work in progress. Development is currently focused on a small, self-conta
 
 ## Active core
 
-- **[Platform.h](Platform.h)** — thin cross-platform shim over BSD sockets / Winsock: a common `socket_t` type, `close_socket`/`last_error` wrappers, one-time `WSAStartup`/`WSACleanup` via `ensure_started()`, and SIGPIPE-safe send flags.
+- **[Platform.h](Platform.h)** — thin cross-platform shim over BSD sockets / Winsock: a common `socket_t` type, `close_socket` wrapper, one-time `WSAStartup`/`WSACleanup` via `ensure_started()`, and SIGPIPE-safe send flags. Two separate last-error accessors — `last_error()` (socket calls; `WSAGetLastError()` on Windows) and `last_file_error()` (everything else; plain `GetLastError()` on Windows) — since the two aren't interchangeable there.
 - **[ResultType.h](ResultType.h)** — `tcp::Result<T>`, a minimal success-value-or-error-code type used in place of exceptions across the API.
 - **[Stream.h](Stream.h) / [Stream.cpp](Stream.cpp)** — `tcp::IStream`, the `read_some` / `write_some` / `write_all` interface `Connection` implements, so higher-level code depends on an abstraction rather than a raw socket. `read_some`/`write_some` are pure virtual; `write_all` is a concrete loop over `write_some` that accumulates bytes written and retries on short writes.
 - **[Connection.h](Connection.h) / [Connection.cpp](Connection.cpp)** — RAII wrapper around a connected socket: move-only, closes its descriptor on destruction, retries on `EINTR`, and reports peer EOF as `Result::ok(0)` rather than an error.
 - **[Listener.h](Listener.h) / [Listener.cpp](Listener.cpp)** — RAII wrapper around a listening socket. `Listener::create(port)` is a factory returning `Result<Listener>`, so a partially-initialized listener can never escape into a live object; `accept()` hands back a `Connection`.
 - **[BufferedReader.h](BufferedReader.h) / [BufferedReader.cpp](BufferedReader.cpp)** — buffered reads on top of an `IStream`: `read_until` for delimiter-based reads (request lines, headers), `read_exact` for fixed-size reads (a body sized by `Content-Length`). Both share a private chunk-reading helper.
-- **[Main.cpp](Main.cpp)** — a small echo-server demo exercising `Listener` and `Connection` end to end.
+- **[HttpParser.h](HttpParser.h) / [HttpParser.cpp](HttpParser.cpp)** — the HTTP layer, composed over `BufferedReader` rather than a concrete socket:
+  - `Http::build_request(reader)` — parses a request line, headers (merging duplicates per RFC 7230 3.2.2, rejecting duplicate `Content-Length`/`Host`), and a `Content-Length`-sized body into an `HttpRequest`. Failures return a `Http::ParseError` (distinct from the propagated OS `errno` values used for actual socket failures) via `tcp::Result`.
+  - `Http::route(url)` — resolves a URL to a file path via a small static lookup table, falling back to `templates/index.html` for anything unmapped.
+  - `Http::build_response(request)` — reads the routed file off disk and builds an `HttpResponse`; a missing file is a normal `200`/`404`-style `Result::ok`, not an `err` — `err` is reserved for genuine I/O failures, reported via `last_file_error()`.
+  - `Http::serialize_response(response)` — renders an `HttpResponse` into wire-format bytes, with a small status-code → reason-phrase lookup (`200`/`404` today).
+- **[Main.cpp](Main.cpp)** — a minimal static-file HTTP server: accepts connections in a loop and runs each one through `build_request` → `build_response` → `serialize_response` → `write_all`.
 
-Together these give you a working, dependency-free echo server today. The active core — `Listener`, `Connection`, `IStream`/`Stream`, `BufferedReader` — is now feature-complete for basic reads and writes.
+Together these give you a working, dependency-free HTTP server today, serving static files out of `templates/` with basic routing. The transport core — `Listener`, `Connection`, `IStream`/`Stream`, `BufferedReader` — is feature-complete for basic reads and writes.
 
 ## Direction
 
-Building an HTTP layer on top of `Connection`, `Listener`, and `BufferedReader` — request/response parsing composed over `IStream` rather than bound to a concrete transport, so an HTTPS layer can later slot in as a `TlsStream : IStream` without changing the HTTP code at all.
+The HTTP layer is minimal by design right now — known gaps, not oversights:
+- Only `templates/index.html` and whatever's manually added to `Http::route`'s lookup table are servable; there's no directory serving or MIME-type-by-extension yet (`Content-Type` isn't set on responses at all currently).
+- The reason-phrase table in `serialize_response` only knows `200`/`404`; anything else renders as `"Unknown"`.
+- No keep-alive — one request per accepted connection.
+
+Longer-term, an HTTPS layer should be able to slot in as a `TlsStream : IStream` without changing the HTTP code at all, since everything above is composed over `IStream`/`BufferedReader` rather than bound to a concrete transport.
 
 An earlier, inheritance-based HTTP server implementation (`TcpUtils`, `TcpHttpProtocol`, `TcpHttpServer`, `TcpHttpServerImplementation` — raw `SOCKET` handles, manual `closesocket` calls, no RAII) was removed from the working tree since it was never wired into the active core. It's still recoverable from git history if it's ever worth referencing again.
 
@@ -30,8 +40,16 @@ There's no build system wired up yet — compile the active core directly:
 
 ```bash
 # Linux/macOS
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp -o server
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp -o server
 
 # Windows (MinGW)
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp -o server.exe -lws2_32
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp -o server.exe -lws2_32
 ```
+
+## Running
+
+```bash
+./server
+```
+
+Listens on port `8080` and serves requests until `accept()` fails. Visit `http://localhost:8080/` (or `curl -v`) to hit `templates/index.html`.

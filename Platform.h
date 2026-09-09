@@ -7,6 +7,7 @@
   inline constexpr socket_t kInvalidSocket = INVALID_SOCKET;
   inline int close_socket(socket_t s) { return ::closesocket(s); }
   inline int last_error() { return ::WSAGetLastError(); }
+  inline int last_file_error() { return static_cast<int>(::GetLastError()); }
   inline int set_reuseaddr(socket_t s) {
       char yes = 1;
       return ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -21,6 +22,7 @@
   inline constexpr socket_t kInvalidSocket = -1;
   inline int close_socket(socket_t s) { return ::close(s); }
   inline int last_error() { return errno; }
+  inline int last_file_error() { return errno; }
   inline int set_reuseaddr(socket_t s) {
       int yes = 1;
       return ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));

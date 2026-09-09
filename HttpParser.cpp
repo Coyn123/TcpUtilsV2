@@ -6,15 +6,32 @@
 #include <cctype>
 #include <limits>
 #include <filesystem>
+#include <fstream>
+#include <unordered_map>
+
+std::string Http::route(const std::string& url) {
+
+    static const std::unordered_map<std::string, std::string> routes = {
+        {"/", "templates/index.html"}
+    };
+    auto it = routes.find(url);
+    if (it != routes.end()) {
+        return it->second;
+    } else {
+        return "templates/index.html";
+    }
+
+}
+
 
 
 tcp::Result<HttpResponse> Http::build_response(const HttpRequest& in) {
 
-    std::string path = "templates/index.html";
+    std::string path = route(in.url);
 
     if( std::filesystem::exists(path) ) {
         std::ifstream file(path, std::ios::binary);
-        if(!file) return tcp::Result<HttpResponse>::err(errno);
+        if(!file) return tcp::Result<HttpResponse>::err(last_file_error());
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string body = buffer.str();
@@ -27,8 +44,14 @@ tcp::Result<HttpResponse> Http::build_response(const HttpRequest& in) {
 }
 
 std::string Http::serialize_response(const HttpResponse& response) {
-    std::string ret = "HTTP/1.1 ";
-    ret += "200 OK\r\n";
+    static const std::unordered_map<int, std::string> reasons = {
+        {200, "OK"},
+        {404, "Not Found"},
+    };
+    auto it = reasons.find(response.status_code);
+    std::string reason = (it != reasons.end()) ? it->second : "Unknown";
+
+    std::string ret = "HTTP/1.1 " + std::to_string(response.status_code) + " " + reason + "\r\n";
     for (const auto& [key,value] : response.headers) {
         ret += key + ": ";
         ret += value + "\r\n";
