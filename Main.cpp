@@ -1,9 +1,12 @@
 #include <cstdio>
-#include "Listener.h"
-#include "HttpParser.h"
-#include "ResultType.h"
 #include <cstring>
+#include <memory>
+#include <thread>
 #include <utility>
+#include "HttpTask.h"
+#include "Listener.h"
+#include "ResultType.h"
+#include "TaskBase.h"
 
 int main() {
     uint16_t port = 8080;
@@ -16,43 +19,25 @@ int main() {
     Listener listener = std::move(made.value());
     printf("listening on %d\n", port);
 
-    for (int i = 1; ; i = i + 1) {
-        printf("[%d] waiting for a client...\n", i);
+    for (;;) {
+        printf("waiting for a client...\n");
 
         tcp::Result<Connection> incoming = listener.accept();
         if (!incoming) {
-            fprintf(stderr, "[%d] accept failed: %s\n", i, strerror(incoming.error()));
+            fprintf(stderr, "accept failed: %s\n", strerror(incoming.error()));
             break;
         }
 
         Connection conn = std::move(incoming.value());
-        printf("[%d] client connected\n", i);
+        printf("client connected\n");
 
-        BufferedReader reader(conn);
+        std::unique_ptr<TaskBase> task = std::make_unique<HttpTask>(std::move(conn));
 
-        tcp::Result<HttpRequest> request = Http::build_request(reader);
-        if (!request) {
-            fprintf(stderr, "[%d] build_request failed: code %d\n", i, request.error());
-            continue;
-        }
-        const HttpRequest& req = request.value();
-        printf("[%d] %s %s %s\n", i, req.method.c_str(), req.url.c_str(), req.version.c_str());
-
-        tcp::Result<HttpResponse> response = Http::build_response(req);
-        if (!response) {
-            fprintf(stderr, "[%d] build_response failed: code %d\n", i, response.error());
-            continue;
-        }
-
-        std::string bytes = Http::serialize_response(response.value());
-
-        tcp::Result<void> sent = conn.write_all(bytes.data(), bytes.size());
-        if (!sent) {
-            fprintf(stderr, "[%d] write_all failed: %s\n", i, strerror(sent.error()));
-            continue;
-        }
-
-        printf("[%d] sent %zu bytes (status %d)\n", i, bytes.size(), response.value().status_code);
+        // std::thread moves its callable into its own storage instead of going
+        // through std::function, so a lambda holding a move-only unique_ptr
+        // works here with no wrapper needed.
+        std::thread worker([t = std::move(task)]() { t->run_task(); });
+        worker.join(); // PoC only: proves the task runs, adds no concurrency yet
     }
 
     printf("\ndone -- listener closes as main returns\n");
