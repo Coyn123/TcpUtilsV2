@@ -34,5 +34,7 @@ namespace Http {
     };
 
     tcp::Result<HttpRequest> build_request(BufferedReader& reader);
+    std::string serialize_response(const HttpResponse& response);
+    tcp::Result<HttpResponse> build_response(const HttpRequest&);
 
 };

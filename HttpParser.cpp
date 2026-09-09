@@ -2,12 +2,40 @@
 #include "Platform.h"
 #include "Connection.h"
 #include <functional>
-#include <string>
-#include <unordered_map>
-#include <vector>
 #include <sstream>
 #include <cctype>
 #include <limits>
+#include <filesystem>
+
+
+tcp::Result<HttpResponse> Http::build_response(const HttpRequest& in) {
+
+    std::string path = "templates/index.html";
+
+    if( std::filesystem::exists(path) ) {
+        std::ifstream file(path, std::ios::binary);
+        if(!file) return tcp::Result<HttpResponse>::err(errno);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string body = buffer.str();
+        return tcp::Result<HttpResponse>::ok(HttpResponse{200, {{"Content-Length", std::to_string(body.size())}}, body});
+
+    } else {
+        return tcp::Result<HttpResponse>::ok(HttpResponse{404, {{"Content-Length", std::to_string(0)}}, ""});
+    }
+
+}
+
+std::string Http::serialize_response(const HttpResponse& response) {
+    std::string ret = "HTTP/1.1 ";
+    ret += "200 OK\r\n";
+    for (const auto& [key,value] : response.headers) {
+        ret += key + ": ";
+        ret += value + "\r\n";
+    }
+    ret += "\r\n" + response.body;
+    return ret;
+}
 
 tcp::Result<HttpRequest> Http::build_request(BufferedReader& reader) {
 
