@@ -4,7 +4,7 @@ A cross-platform TCP sockets library in C++, built around RAII ownership and exp
 
 ## Status
 
-Active work in progress. Development is currently focused on a small, self-contained core — `Listener` → `Connection` → `IStream` — rather than the full library.
+Active work in progress. Development is currently focused on a small, self-contained core, `Listener` → `Connection` → `IStream` → `TaskBase`/`HttpTask`, rather than the full library.
 
 ## Active core
 
@@ -19,7 +19,9 @@ Active work in progress. Development is currently focused on a small, self-conta
   - `Http::route(url)` — resolves a URL to a file path via a small static lookup table, falling back to `templates/index.html` for anything unmapped.
   - `Http::build_response(request)` — reads the routed file off disk and builds an `HttpResponse`; a missing file is a normal `200`/`404`-style `Result::ok`, not an `err` — `err` is reserved for genuine I/O failures, reported via `last_file_error()`.
   - `Http::serialize_response(response)` — renders an `HttpResponse` into wire-format bytes, with a small status-code → reason-phrase lookup (`200`/`404` today).
-- **[Main.cpp](Main.cpp)** — a minimal static-file HTTP server: accepts connections in a loop and runs each one through `build_request` → `build_response` → `serialize_response` → `write_all`.
+- **[TaskBase.h](TaskBase.h)**: `TaskBase`, an abstract one-shot unit of work, a virtual destructor (so ownership through a base handle cleans up correctly) plus a single pure virtual `run_task()`. No data of its own; each concrete task owns whatever it needs.
+- **[HttpTask.h](HttpTask.h) / [HttpTask.cpp](HttpTask.cpp)**: `HttpTask`, the concrete `TaskBase` for one accepted connection. Takes ownership of a `Connection` at construction; `run_task()` runs the `build_request` → `build_response` → `serialize_response` → `write_all` sequence exactly once and returns. The connection closes via `Connection`'s own destructor once the task itself is destroyed.
+- **[Main.cpp](Main.cpp)**: accepts connections in a loop, wraps each one in a `unique_ptr<TaskBase>` (`HttpTask`), and runs it on a `std::thread`. That thread is joined immediately for now, so this proves the task/thread wiring works; it isn't real concurrency yet (see Direction below).
 
 Together these give you a working, dependency-free HTTP server today, serving static files out of `templates/` with basic routing. The transport core — `Listener`, `Connection`, `IStream`/`Stream`, `BufferedReader` — is feature-complete for basic reads and writes.
 
@@ -28,7 +30,8 @@ Together these give you a working, dependency-free HTTP server today, serving st
 The HTTP layer is minimal by design right now — known gaps, not oversights:
 - Only `templates/index.html` and whatever's manually added to `Http::route`'s lookup table are servable; there's no directory serving or MIME-type-by-extension yet (`Content-Type` isn't set on responses at all currently).
 - The reason-phrase table in `serialize_response` only knows `200`/`404`; anything else renders as `"Unknown"`.
-- No keep-alive — one request per accepted connection.
+- No keep-alive: each `HttpTask` runs once and ends.
+- Concurrency is proof-of-concept only: `Main.cpp` spawns one thread per connection and joins it immediately, so requests are still handled one at a time. Next step is a bounded worker pool, a fixed set of threads pulling `unique_ptr<TaskBase>` off a shared queue guarded by a condition variable and mutex, instead of spawning a thread per connection.
 
 Longer-term, an HTTPS layer should be able to slot in as a `TlsStream : IStream` without changing the HTTP code at all, since everything above is composed over `IStream`/`BufferedReader` rather than bound to a concrete transport.
 
@@ -40,11 +43,13 @@ There's no build system wired up yet — compile the active core directly:
 
 ```bash
 # Linux/macOS
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp -o server
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp HttpTask.cpp -o server -pthread
 
 # Windows (MinGW)
-g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp -o server.exe -lws2_32
+g++ -std=c++20 Main.cpp Listener.cpp Connection.cpp Stream.cpp BufferedReader.cpp HttpParser.cpp HttpTask.cpp -o server.exe -lws2_32
 ```
+
+`std::thread` is used now. If the Windows build fails to link, or `std::thread` throws at runtime, add `-pthread` (needed on some MinGW-w64 builds; a "win32 threads" MinGW distribution doesn't support `std::thread` at all and needs a different toolchain).
 
 ## Running
 
