@@ -2,6 +2,9 @@
 #include <unordered_map>
 #include <vector>
 #include "BufferedReader.h"
+
+constexpr size_t kMaxRequestLineBytes = 8192;
+
 struct HttpResponse {
     int status_code = 0;
     std::unordered_map<std::string, std::string> headers;
@@ -18,6 +21,18 @@ struct HttpRequest {
 };
 
 namespace Http {
+    enum class ParseError : int {
+        RequestLineTooLong, // hit byte_max before finding \r\n on the request line
+        RequestLineMalformed, // request line didn't split into exactly 3 tokens
+        HeaderLineTooLong, // hit byte_max before finding \r\n on a header line
+        HeaderMissingColon, // header line has no ':' to split on
+        DuplicateHeader, // same header key seen twice
+        ContentLengthEmpty, // Content-Length value is an empty string
+        ContentLengthTooLong, // Content-Length value has more digits than can fit unsigned long
+        ContentLengthInvalid, // Content-Length value contains a non-digit character
+        BodyTruncated, // connection closed before Content-Length bytes arrived
+    };
+
     tcp::Result<HttpRequest> build_request(BufferedReader& reader);
 
 };
