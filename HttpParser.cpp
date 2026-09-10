@@ -9,6 +9,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <iterator>
+#include <algorithm>
 
 std::string Http::route(const std::string& url) {
 
@@ -21,10 +22,7 @@ std::string Http::route(const std::string& url) {
     } else {
         return "templates/index.html";
     }
-
 }
-
-
 
 tcp::Result<HttpResponse> Http::build_response(const HttpRequest& in) {
 
@@ -83,7 +81,7 @@ tcp::Result<HttpRequest> Http::build_request(BufferedReader& reader) {
     ret.url = split_request[1];
     ret.version = split_request[2];
 
-
+    //Headers loop start
     for(;;) {
         tcp::Result<tcp::BufferedResult> try_headers = reader.read_until("\r\n", kMaxRequestLineBytes);
         if(!try_headers) {
@@ -101,19 +99,39 @@ tcp::Result<HttpRequest> Http::build_request(BufferedReader& reader) {
         std::string value = cur.substr(start, (cur.size()-2) - start);
         std::string key = cur.substr(0, splitter);
 
-        //Sanitize
+        //Lowercase normalize the key
+        std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
+            return std::tolower(c);
+        });
+
+
+        //Place the keys
         auto existing = ret.headers.find(key);
         if (existing != ret.headers.end()) {
-            //Content-Length / Host duplicates are dangerous, every other header can be merged per RFC 7230 3.2.2
-            if (key == "Content-Length" || key == "Host")
+            //Content-Length / Host duplicates are dangerous, every other header can be merged
+            if (key == "content-length" || key == "host")
                 return tcp::Result<HttpRequest>::err(static_cast<int>(Http::ParseError::DuplicateHeader));
             existing->second += ", " + value;
         } else {
             ret.headers[key] = value;
         }
+
+    } //Headers loop end
+
+    auto ws1 = ret.headers.find("upgrade");
+    auto ws2 = ret.headers.find("connection");
+    auto ws3 = ret.headers.find("sec-websocket-key");
+    auto wsCheck = ret.headers.end();
+    if(ws1 != wsCheck && ws2 != wsCheck && ws3 != wsCheck) {
+        if (ws1->second == "websocket" && ws2->second.find("upgrade") != std::string::npos) {
+            ret.is_ws_upgrade = true;
+        }
     }
 
-    auto check_length = ret.headers.find("Content-Length");
+
+    if(ret.is_ws_upgrade) return tcp::Result<HttpRequest>::ok(ret);
+
+    auto check_length = ret.headers.find("content-length");
 
     //If we have a Content-Length at all (start)
     if (check_length != ret.headers.end() ) {

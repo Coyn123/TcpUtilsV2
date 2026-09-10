@@ -14,6 +14,14 @@ void HttpTask::run_task() {
         return;
     }
     const HttpRequest& req = request.value();
+
+    if(req.is_ws_upgrade) {
+        //Key guaranteed to exist via build_request.. flag is set.
+        std::string socket_key = req.headers.at("sec-websocket-key");
+        socket_key += kRFCguid;
+
+
+    }
     printf("%s %s %s\n",req.method.c_str(), req.url.c_str(), req.version.c_str());
 
     tcp::Result<HttpResponse> response = Http::build_response(req);

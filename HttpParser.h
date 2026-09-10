@@ -4,6 +4,7 @@
 #include "BufferedReader.h"
 
 constexpr size_t kMaxRequestLineBytes = 8192;
+constexpr std::string_view kRFCguid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 struct HttpResponse {
     int status_code = 0;
@@ -17,6 +18,7 @@ struct HttpRequest {
     std::unordered_map<std::string, std::string> headers;
     std::string body;
     std::string version;
+    bool is_ws_upgrade = false;
 
 };
 
