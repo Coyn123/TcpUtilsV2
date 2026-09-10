@@ -1,6 +1,10 @@
 #include "Base64.h"
 #include <cstdint>
+
+
+namespace {
 static const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+}
 
 
 std::string base64_encode(const unsigned char* data, size_t len) {

@@ -1,6 +1,6 @@
 #include "HttpParser.h"
-#include "Platform.h"
-#include "Connection.h"
+#include "core/Platform.h"
+#include "transport/Connection.h"
 #include <functional>
 #include <sstream>
 #include <cctype>

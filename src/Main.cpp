@@ -3,10 +3,10 @@
 #include <memory>
 #include <thread>
 #include <utility>
-#include "HttpTask.h"
-#include "Listener.h"
-#include "ResultType.h"
-#include "TaskBase.h"
+#include "tasks/HttpTask.h"
+#include "transport/Listener.h"
+#include "core/ResultType.h"
+#include "tasks/TaskBase.h"
 
 int main() {
     uint16_t port = 8080;

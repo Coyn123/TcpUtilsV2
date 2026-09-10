@@ -1,6 +1,6 @@
 #include "BufferedReader.h"
-#include "Platform.h"
-#include "ResultType.h"
+#include "core/Platform.h"
+#include "core/ResultType.h"
 #include <algorithm>
 
 BufferedReader::BufferedReader(tcp::IStream& stream) : stream_(stream) {}
