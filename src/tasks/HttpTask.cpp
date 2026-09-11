@@ -2,6 +2,7 @@
 #include "http/HttpParser.h"
 #include "util/Sha1.h"
 #include "util/Base64.h"
+#include "tasks/WSTask.h"
 #include <unordered_map>
 #include <utility>
 
@@ -42,8 +43,9 @@ void HttpTask::run_task() {
 
         if(!try_write) {
             fprintf(stderr, "serialize web-socket upgrade failed: code %d\n", try_write.error());
+            return;
         }
-        return;
+        WSTask(std::move(connection_)).run_task(); return;
     } //Websocket upgrade path end
 
     printf("%s %s %s\n",req.method.c_str(), req.url.c_str(), req.version.c_str());

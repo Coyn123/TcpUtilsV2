@@ -124,7 +124,7 @@ tcp::Result<HttpRequest> Http::build_request(BufferedReader& reader) {
     auto ws3 = ret.headers.find("sec-websocket-key");
     auto wsCheck = ret.headers.end();
     if(ws1 != wsCheck && ws2 != wsCheck && ws3 != wsCheck) {
-        if (ws1->second == "websocket" && ws2->second.find("upgrade") != std::string::npos) {
+        if (ws1->second == "websocket" && ws2->second.find("Upgrade") != std::string::npos) {
             ret.is_ws_upgrade = true;
         }
     }
