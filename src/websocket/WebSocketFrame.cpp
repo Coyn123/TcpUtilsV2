@@ -1,6 +1,38 @@
 #include "WebSocketFrame.h"
 
 
+std::string WebSocket::serialize_frame(const WsFrame& in) {
+
+    std::string ret;
+    ret += static_cast<char>((in.finbit << 7) | (in.opcode & 0x0F));
+
+    if (in.payload.size() <= 125) {
+        ret += static_cast<char>(in.payload.size());
+    } else if (in.payload.size() >= 126 && in.payload.size() <= 65535) {
+        ret += static_cast<char>(126);
+        //Top bits
+        ret += static_cast<char>((in.payload.size() >> 8) & 0xFF);
+
+        //Bottom bits
+        ret += static_cast<char>(in.payload.size() & 0xFF);
+    } else if (in.payload.size() > 65535) {
+
+        ret += static_cast<char>(127);
+
+        //High - Low shift/masks
+        ret += static_cast<char>((in.payload.size() >> 56) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 48) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 40) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 32) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 24) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 16) & 0xFF);
+        ret += static_cast<char>((in.payload.size() >> 8) & 0xFF);
+        ret += static_cast<char>(in.payload.size() & 0xFF);
+    }
+    ret += in.payload;
+    return ret;
+}
+
 tcp::Result<WsFrame> WebSocket::parse_frame(BufferedReader& reader) {
     WsFrame local_frame;
     tcp::Result<tcp::BufferedResult> try_read = reader.read_exact(2);
